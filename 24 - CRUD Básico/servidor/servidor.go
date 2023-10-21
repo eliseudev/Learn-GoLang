@@ -36,7 +36,8 @@ func CriarUsuario(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	statement, err := db.Prepare("insert into usuarios(nome, email) values(?, ?)")
+	sqlQuery := "insert into usuarios(nome, email) values(?, ?)"
+	statement, err := db.Prepare(sqlQuery)
 	if err != nil {
 		w.Write([]byte("Erro ao criar o statement!"))
 		return
@@ -68,7 +69,8 @@ func BuscarUsuarios(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	lines, err := db.Query("select * from usuarios")
+	sqlQuery := "select * from usuarios"
+	lines, err := db.Query(sqlQuery)
 	if err != nil {
 		w.Write([]byte("Erro ao buscar os usuários"))
 		return
@@ -108,7 +110,8 @@ func BuscarUsuario(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	line, err := db.Query("select * from usuarios where id = ?", ID)
+	sqlQuery := "select * from usuarios where id = ?"
+	line, err := db.Query(sqlQuery, ID)
 	if err != nil {
 		w.Write([]byte("Erro ao buscar o usuário!"))
 		return
@@ -124,6 +127,79 @@ func BuscarUsuario(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(usuario); err != nil {
 		w.Write([]byte("Erro ao cconverter usuário para JSON!"))
+		return
+	}
+}
+
+func AtualizarUsuario(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	ID, err := strconv.ParseUint(params["id"], 10, 32)
+	if err != nil {
+		w.Write([]byte("Erro ao converter o parâmetro para inteiro"))
+		return
+	}
+
+	bobyRequest, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.Write([]byte("Erro ao ler o corpo da requisição"))
+		return
+	}
+
+	var usuario usuario
+	if err := json.Unmarshal(bobyRequest, &usuario); err != nil {
+		w.Write([]byte("Erro ao converter o usuário para struct"))
+		return
+	}
+
+	db, err := banco.Conectar()
+	if err != nil {
+		w.Write([]byte("Erro ao conectar com o banco!"))
+		return
+	}
+	defer db.Close()
+
+	sqlQuery := "update usuarios set nome = ?, email = ? where id = ?"
+	statement, err := db.Prepare(sqlQuery)
+	if err != nil {
+		w.Write([]byte("Erro ao criar o statement!"))
+		return
+	}
+	defer statement.Close()
+
+	if _, err := statement.Exec(usuario.Nome, usuario.Email, ID); err != nil {
+		w.Write([]byte("Erro ao atualizar usuário!"))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func DeletarUsuario(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	ID, err := strconv.ParseUint(params["id"], 10, 32)
+	if err != nil {
+		w.Write([]byte("Erro ao converter parâmetro para inteiro"))
+		return
+	}
+
+	db, err := banco.Conectar()
+	if err != nil {
+		w.Write([]byte("Erro ao conectar com o banco de dados!"))
+		return
+	}
+	defer db.Close()
+
+	sqlQuery := "delete from usuario where id = ?"
+	statement, err := db.Prepare(sqlQuery)
+	if err != nil {
+		w.Write([]byte("Erro ao criar o statement!"))
+		return
+	}
+	defer statement.Close()
+
+	if _, err := statement.Exec(ID); err != nil {
+		w.Write([]byte("Erro ao deletar o usuário"))
 		return
 	}
 }
